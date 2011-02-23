@@ -28,11 +28,11 @@ NAPT66 uses Application Level Gateways (ALGs) and DNS Proxy to deal with complex
 
 In some certain scenarios, NAPT66 is unacceptable for these limitations.
 
-·Breaking the end-to-end model
+_·Breaking the end-to-end model_
 
 Several traditional NAT traversal techniques (e.g. ALGs, UPnP) may helps to solve the problem.
 
-·No fragmentation
+_·No fragmentation_
 
 Avoiding fragmentation is one of the principles of IPv6. NAPT66 don’t support IPv6 fragmentation for the moment.
 
