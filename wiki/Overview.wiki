@@ -1,5 +1,5 @@
+#summary overview of NAPT66
 #labels Phase-Implementation
-#Overview of NAPT66
 
 = Introduction =
 IPv6-IPv6 Network Address Port Translation (NAPT66) is a stateful IPv6 NAT mechanism. Likely to IPv4 NAT, NAPT66 technique makes several hosts share a public IPv6 address. As a result, NAPT66 helps to hide the private network topology and promote network security. 
