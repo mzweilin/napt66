@@ -21,7 +21,7 @@ NAPT66 uses Application Level Gateways (ALGs) and DNS Proxy to deal with complex
 
 ·Telnet 
 
-·ICMPv6 - 4 kinds of Error Packets and 2 kinds of Information Packets 
+·ICMPv6 - echo request, echo reply，error messages(Destination Unreachable、Packet Too Big、Time Exceeded、Parameter Problem)
 
 
 =Limitations=
