@@ -1,4 +1,3 @@
-#labels netfilter,NAPT66
 The NAPT66 kernel module based on the Netfilter
 
 = Introduction =
