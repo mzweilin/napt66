@@ -98,17 +98,6 @@ int nat(struct sk_buff *skb,struct conn_entry* entry,int direc)
 				if(entry->dport != 0x1500){
 					tcp_header->check = adjust_checksum(tcp_header->check,entry->sub_sum);
 				}
-				/*对于EPRT报文之后的FTP控制报文，需要修改出站方向报文的seq字段*/
-/*				else if(entry->eprt_len_change != 0){*/
-/*					tcp_header->seq = htonl(ntohl(tcp_header->seq) + entry->eprt_len_change);*/
-/*					*/
-/*					len = htons(ipv6_header->payload_len);					*/
-/*					tcp_header->check = 0;*/
-/*					sum = in_cksum((u_int16_t *)&ipv6_header->saddr,32);*/
-/*					sum += ntohs(0x6 + len);*/
-/*					sum += in_cksum((u_int16_t *)tcp_header, len);*/
-/*					tcp_header->check = CKSUM_CARRY(sum);*/
-/*				}*/
 				
 				/*EPRT报文之前的控制报文*/
 				else if(entry->eprt_len_change == 0){
