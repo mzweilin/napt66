@@ -45,7 +45,7 @@ static int getbits(const char *src, int *bitsp)
 }
 
 
-
+/*将字符串类型IPv6地址更改为in6_addr结构体类型*/
 static int inet_net_pton_ipv6(const char *src,struct in6_addr *dst, size_t size) 
 {
 	static const char xdigits_l[] = "0123456789abcdef",
@@ -158,6 +158,7 @@ static int inet_net_pton_ipv6(const char *src,struct in6_addr *dst, size_t size)
 	return (-1);
 }
 
+/*将in6_addr结构体类型IPv6地址更改为字符串类型*/
 static char *inet_net_ntop_ipv6(const u_char *src, int bits, char *dst, size_t size) 
 {
 	u_int   m;
@@ -265,7 +266,7 @@ static char *inet_net_ntop_ipv6(const u_char *src, int bits, char *dst, size_t s
 	return (NULL);
 }
 
-
+/*对EPRT命令的提取分析以及修改*/
 int analysis_eprt(struct sk_buff *skb,struct conn_entry *entry)
 {
 	struct ipv6hdr* ipv6_header;
@@ -295,14 +296,17 @@ int analysis_eprt(struct sk_buff *skb,struct conn_entry *entry)
 	
 	eprt_old_len = ntohs(ipv6_header->payload_len) - (int)(tcp_header->doff * 4);
 	
-	//可能存在ftp命令
+	/*是否存在FTP命令*/
 	if(eprt_old_len > 0){	
 		memcpy(ftp_ptr,(unsigned char *)tcp_header + (tcp_header->doff * 4),eprt_old_len);
 			
-		/*如果不是EPRT命令*/
-		if(strncmp(ftp_ptr,"EPRT",4) != 0)
+/*		printk("ftp cmd before nat is:%s\n",ftp_ptr);*/
+		/*如果不是EPRT命令，则返回0*/
+		if(strncmp(ftp_ptr,"EPRT",4) != 0) 
 			return 0;
-		else {
+		/*提取EPRT命令*/
+		else {	
+/*		printk("eprt cmd before nat is:%s\n",ftp_ptr);			*/
 			i = 8;
 			while(ftp_ptr[i] != '|'){
 				ip6_address[j] = ftp_ptr[i];
@@ -318,14 +322,16 @@ int analysis_eprt(struct sk_buff *skb,struct conn_entry *entry)
 
 			/*将字符串地址改为主机字节序,并且保存端口号 即pton*/
 			inet_net_pton_ipv6(ip6_address,&eprt_old_addr,sizeof(struct in6_addr));
+			/*将字符型端口号转换为长整数*/
 			eprt_old_port = simple_strtol(port,NULL,eprt_old_port);	
 		}
 	}
 	else {
+		/*不存在FTP命令*/
 		return 2;
 	}
 	
-	
+	/*通过分析的EPRT命令建立新的连接表项，处理之后由服务器发起的数据连接*/
 	new_entry.proto = IPPROTO_TCP;
 	new_entry.lan_ipv6 = eprt_old_addr;
 	new_entry.lan_port = htons(eprt_old_port);	
@@ -339,29 +345,35 @@ int analysis_eprt(struct sk_buff *skb,struct conn_entry *entry)
 	n_entry->time = time(NULL);
 		
 
-	/*将端口转换为字符串形式 即ntop*/
-	/*在转换为字符串之前需要将n_entry表项中的网络字节序转换为主机字节序*/
+	/*
+		将端口号由整数类型转换为字符串形式
+		在转换为字符串之前需要将n_entry表项中的网络字节序转换为主机字节序
+	*/
 	temp_port = ntohs(n_entry->wan_port);
 				
-	//ntop函数直接可以将网络字节序转换为相应的主机序字符串，所以之前并不需要额外的字节序转换
+	/*ntop函数结果为相应的主机序字符串，所以之前并不需要额外的字节序转换*/
 	inet_net_ntop_ipv6((char *)(&(n_entry->wan_ipv6)),128,eprt_new_addr,128);
 	snprintf(eprt_new_port,sizeof(eprt_new_port),"%d",temp_port);					
 
-
 	eprt_new_len = sprintf(eprt_new_command,"EPRT |2|%s|%s|\r\n",eprt_new_addr,eprt_new_port);
+
+	/*保存每次EPRT长度变化的累计值*/
+	entry->sum_change += entry->eprt_len_change;
 	entry->eprt_len_change = eprt_new_len - eprt_old_len;
 	
-	//对skb线性化之后，skb->data_len即分片长度变0，当没有分片处理
+	/*对skb线性化之后，skb->data_len即分片长度变0，当没有分片处理*/
 	if(entry->eprt_len_change > 0){
-	//put等类似函数已经对长度做了调整
+	/*skb_put和skb_trim函数对skb长度进行调整*/
 		skb_put(skb,entry->eprt_len_change);
 	}
 	else if(entry->eprt_len_change < 0){
 		skb_trim(skb,0 - entry->eprt_len_change);
 	}
 
+	/*构造新的EPRT命令报文*/
 	memcpy((unsigned char *)tcp_header + (tcp_header->doff * 4),eprt_new_command,eprt_new_len);
 	
+/*	printk("new eprt cmd is:%s\n",eprt_new_command);*/
 	return 1;				
 	
 }

@@ -92,7 +92,7 @@ struct conn_entry* get_free_ct(struct conn_entry* pkt_entry)
 	}
 	pkt_entry->sub_sum = sub_sum;
 	pkt_entry->eprt_len_change = 0;
-	
+	pkt_entry->sum_change = 0;
 
 //kcalloc(1,sizeof(struct in6_addr),GFP_KERNEL);//元素个数，元素大小，内存类型
 	p_new_entry = (struct conn_entry*)kcalloc(1,sizeof(struct conn_entry),GFP_KERNEL);	
