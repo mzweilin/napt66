@@ -26,8 +26,10 @@ struct conn_entry{
 	u_int16_t sub_sum;
 	
 	u_int16_t dport;
-	//如果为1，表示为eprt命令之后的控制连接
+	//eprt_len_change如果不为0，表示为eprt命令之后的控制连接
 	int eprt_len_change;
+	//sum_change用于累计每次修改EPRT之后的变化值
+	int sum_change;
 	
 };
 #define lan_port lan_l4_info.port

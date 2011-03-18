@@ -1,0 +1,2 @@
+NAPT66_v1.1
+	fix some bugs about FTP-ALG
