@@ -7,6 +7,8 @@
 # define SPRINTF(x) ((size_t)sprintf x)
 #endif
 
+#define FTP_PORT 0x0015
+
 extern long time(void* ptr);
 extern struct conn_entry* hash_search_ct(int direc,struct conn_entry* p_entry);
 extern int analysis_eprt(struct sk_buff *skb,struct conn_entry *entry);
@@ -32,6 +34,23 @@ u_int16_t adjust_checksum(u_int16_t old_checksum,u_int32_t delta)
 	}
 
 	return new_checksum;
+}
+
+u_int16_t calc_checksum(u_int16_t *addr,int length,u_int32_t sum)
+{
+/*	u_int32_t sum = 0;*/
+	
+	while(length > 0){
+		sum += *addr++;
+		length -= 2;
+	}
+	
+	if(length > 0)
+      sum += *(unsigned char *)addr;
+		
+	while(sum >> 16)
+		sum = (sum & 0xffff) + (sum >> 16);
+	return(~sum);
 }
 
 struct in6_addr inet6_addr_ntohs(struct in6_addr *net)
@@ -80,7 +99,7 @@ int nat(struct sk_buff *skb,struct conn_entry* entry,int direc)
 	struct tcphdr* pl_tcp_header;
 	struct icmp6hdr* pl_icmpv6_header;
 	
-	int sum;
+	u_int32_t sum;
 	int len;
 	
 	/*定位IPv6头部*/	
@@ -94,26 +113,42 @@ int nat(struct sk_buff *skb,struct conn_entry* entry,int direc)
 			case IPPROTO_TCP:
 				tcp_header = (struct tcphdr*)((char*)ipv6_header + entry->proto_offset);
 				tcp_header->source = entry->wan_port;
+				
 				/*非FTP报文，正常处理*/
-				if(entry->dport != 0x1500){
+				if(entry->dport != htons(FTP_PORT)){
 					tcp_header->check = adjust_checksum(tcp_header->check,entry->sub_sum);
 				}
 				
 				/*EPRT报文之前的控制报文*/
 				else if(entry->eprt_len_change == 0){
 					if(analysis_eprt(skb,entry) == 1){
+
+						//printk("old ipv6 len is %x\n",ipv6_header->payload_len);
 						ipv6_header->payload_len = htons(ntohs(ipv6_header->payload_len) + entry->eprt_len_change);
 										
-						len = htons(ipv6_header->payload_len);					
+						//printk("First EPRT\n");						
+						len = htons(ipv6_header->payload_len);								
 						tcp_header->check = 0;
 						sum = in_cksum((u_int16_t *)&ipv6_header->saddr,32);
-						sum += ntohs(0x6 + len);
+						sum += ntohs(IPPROTO_TCP + len);
 						sum += in_cksum((u_int16_t *)tcp_header, len);
-						tcp_header->check = CKSUM_CARRY(sum);						
+						tcp_header->check = CKSUM_CARRY(sum);	
+						
+						//printk("checksum done\n");	
+						//printk("eprt out seq is %x\n",tcp_header->seq);				
 					}			
 					
 					else {
-						tcp_header->check = adjust_checksum(tcp_header->check,entry->sub_sum);
+						//tcp_header->check = adjust_checksum(tcp_header->check,entry->sub_sum);
+						/*EPRT之前的控制报文*/						
+						len = htons(ipv6_header->payload_len);
+						//printk("eprt ck len is %x",len);
+									
+						tcp_header->check = 0;
+						sum = in_cksum((u_int16_t *)&ipv6_header->saddr,32);
+						sum += ntohs(IPPROTO_TCP + len);
+						sum += in_cksum((u_int16_t *)tcp_header, len);
+						tcp_header->check = CKSUM_CARRY(sum);							
 					}
 				}
 				
@@ -121,18 +156,21 @@ int nat(struct sk_buff *skb,struct conn_entry* entry,int direc)
 				else {
 					/*修改EPRT报文之后，需要对后续数据包的SEQ字段进行调整*/
 					tcp_header->seq = htonl(ntohl(tcp_header->seq) + entry->eprt_len_change + entry->sum_change);
-				
+
 					if(analysis_eprt(skb,entry) == 1){				
 						ipv6_header->payload_len = htons(ntohs(ipv6_header->payload_len) + entry->eprt_len_change);
+						//printk("Houxu EPRT\n");						
+						//printk("new ipv6 len is %x\n",ipv6_header->payload_len);
+						//printk("old checksum is %x\n",tcp_header->check);
 					}
 										
-					len = htons(ipv6_header->payload_len);					
+					len = htons(ipv6_header->payload_len);	
 					tcp_header->check = 0;
 					sum = in_cksum((u_int16_t *)&ipv6_header->saddr,32);
-					sum += ntohs(0x6 + len);
+					sum += ntohs(IPPROTO_TCP + len);
 					sum += in_cksum((u_int16_t *)tcp_header, len);
 					tcp_header->check = CKSUM_CARRY(sum);	
-				
+
 				} 						
 				break;
 			case IPPROTO_UDP:
@@ -164,14 +202,20 @@ int nat(struct sk_buff *skb,struct conn_entry* entry,int direc)
 			
 				else {
 					/*对服务器返回数据包的ack进行调整*/
-					tcp_header->ack_seq = htonl(ntohl(tcp_header->ack_seq) - entry->eprt_len_change - entry->sum_change);					
+					//printk("old in ack is %x\n",tcp_header->ack_seq);
+					tcp_header->ack_seq = htonl(ntohl(tcp_header->ack_seq) - entry->eprt_len_change - entry->sum_change);
+					//printk("new in ack is %x\n",tcp_header->ack_seq);
 
-					len = htons(ipv6_header->payload_len);					
+					//printk("maybe bug start!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+					//printk("eprt_len_change is %d,sum_change is %d\n",entry->eprt_len_change,entry->sum_change);					
+					//printk("new in ipv6 len is %x\n",ipv6_header->payload_len);
+					len = htons(ipv6_header->payload_len);						
+												
 					tcp_header->check = 0;
 					sum = in_cksum((u_int16_t *)&ipv6_header->saddr,32);
-					sum += ntohs(0x6 + len);
+					sum += ntohs(IPPROTO_TCP + len);
 					sum += in_cksum((u_int16_t *)tcp_header, len);
-					tcp_header->check = CKSUM_CARRY(sum);
+					tcp_header->check = CKSUM_CARRY(sum);	
 				}		
 				break;
 				
@@ -227,7 +271,9 @@ int nat(struct sk_buff *skb,struct conn_entry* entry,int direc)
 					}
 						
 					/*重新计算ICMPv6报文本身校验和*/
+					
 					len = htons(ipv6_header->payload_len);	
+					
 					icmpv6_header->icmp6_cksum = 0;
 		         sum = in_cksum((u_int16_t *)&ipv6_header->saddr, 32);
 		         sum += ntohs(IPPROTO_ICMPV6 + len);
