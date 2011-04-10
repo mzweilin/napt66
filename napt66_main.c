@@ -104,6 +104,7 @@ unsigned int hook_func_out(unsigned int hooknum,struct sk_buff *skb,const struct
  int init_module()
 {
 	printk(KERN_INFO "Netfilter module for IPv6 NAPT66. <NSRC_NAPT66_TEAM@BUPT,2010>\n");
+	printk(KERN_INFO "TIME 2011.4.10 final\n");
 
 	inet6_addr_flag = false;
 

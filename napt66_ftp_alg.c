@@ -300,13 +300,12 @@ int analysis_eprt(struct sk_buff *skb,struct conn_entry *entry)
 	if(eprt_old_len > 0){	
 		memcpy(ftp_ptr,(unsigned char *)tcp_header + (tcp_header->doff * 4),eprt_old_len);
 			
-/*		printk("ftp cmd before nat is:%s\n",ftp_ptr);*/
 		/*如果不是EPRT命令，则返回0*/
 		if(strncmp(ftp_ptr,"EPRT",4) != 0) 
 			return 0;
 		/*提取EPRT命令*/
 		else {	
-/*		printk("eprt cmd before nat is:%s\n",ftp_ptr);			*/
+		//printk("eprt cmd before nat is:%s\n",ftp_ptr);
 			i = 8;
 			while(ftp_ptr[i] != '|'){
 				ip6_address[j] = ftp_ptr[i];
@@ -342,15 +341,15 @@ int analysis_eprt(struct sk_buff *skb,struct conn_entry *entry)
 	}
 		
 	n_entry->proto_offset = 40;				
-	n_entry->time = time(NULL);
-		
+	n_entry->time = time(NULL);		
 
 	/*
 		将端口号由整数类型转换为字符串形式
 		在转换为字符串之前需要将n_entry表项中的网络字节序转换为主机字节序
 	*/
 	temp_port = ntohs(n_entry->wan_port);
-				
+	//printk("entry wan port is %d\n",n_entry->wan_port);	
+		
 	/*ntop函数结果为相应的主机序字符串，所以之前并不需要额外的字节序转换*/
 	inet_net_ntop_ipv6((char *)(&(n_entry->wan_ipv6)),128,eprt_new_addr,128);
 	snprintf(eprt_new_port,sizeof(eprt_new_port),"%d",temp_port);					
@@ -361,19 +360,20 @@ int analysis_eprt(struct sk_buff *skb,struct conn_entry *entry)
 	entry->sum_change += entry->eprt_len_change;
 	entry->eprt_len_change = eprt_new_len - eprt_old_len;
 	
-	/*对skb线性化之后，skb->data_len即分片长度变0，当没有分片处理*/
+	//printk("eprt len change is %d\n",entry->eprt_len_change);
+
 	if(entry->eprt_len_change > 0){
 	/*skb_put和skb_trim函数对skb长度进行调整*/
 		skb_put(skb,entry->eprt_len_change);
 	}
 	else if(entry->eprt_len_change < 0){
-		skb_trim(skb,0 - entry->eprt_len_change);
+		skb_trim(skb,skb->len + entry->eprt_len_change);
 	}
 
 	/*构造新的EPRT命令报文*/
 	memcpy((unsigned char *)tcp_header + (tcp_header->doff * 4),eprt_new_command,eprt_new_len);
 	
-/*	printk("new eprt cmd is:%s\n",eprt_new_command);*/
+//	printk("new eprt cmd is:%s\n",eprt_new_command);
 	return 1;				
 	
 }

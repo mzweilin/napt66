@@ -20,11 +20,12 @@ int in_cksum(u_int16_t *addr, int len)
       len -= 2;
    }
    if (len == 1){
-      sum += *(unsigned char *)addr;
+      sum += htons(*(unsigned char *)addr << 8);
    }
    
    return (sum);
 }
+
 
 int find_conflict(struct conn_entry* pkt_entry)
 {
