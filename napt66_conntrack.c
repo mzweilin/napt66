@@ -3,6 +3,10 @@
 #define MAX_ID 60000
 #define MIN_ID 2048
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35)
+#define LINUX2635
+#endif
+
 extern char *wan_if;
 extern struct in6_addr wan_ipv6;
 extern int hash_add_entry(struct conn_entry* p_entry);
@@ -247,6 +251,48 @@ int conn_init(struct sk_buff *skb,struct conn_entry* entry,int direc)
 	}//while(1)
 }
 
+/*
+
+*/
+
+#ifdef LINUX2635
+/*kernel>=2.6.35*/
+/*Modified by woshiyuhao0819@gmail.com to support the kernel 2.6.35 or upper*/
+int get_ip6_by_name(char* if_name,struct in6_addr* p_ipv6)
+{
+	struct net_device *dev;
+	struct net *net = NULL;
+	struct socket *sock;
+	struct inet6_dev *in_dev6;
+	struct inet6_ifaddr *ifa6 = NULL;
+	struct list_head* list_head_ipv6 = NULL;
+	struct list_head* temp;
+	sock_create_kern(PF_INET6, SOCK_DGRAM, 0,&sock);
+	net = sock_net((const struct sock *)sock->sk);
+	dev = dev_get_by_name(net,if_name);
+	
+	in_dev6 = (struct inet6_dev *)dev->ip6_ptr;
+	
+	while (in_dev6){
+		temp=&(in_dev6->addr_list);
+		list_for_each(list_head_ipv6,temp)
+		{
+			ifa6=list_entry(list_head_ipv6,struct inet6_ifaddr,if_list);
+			if(ifa6)
+				if(ifa6->scope == IPV6_ADDR_ANY){
+					(*p_ipv6) = ifa6->addr;//addr即为eth0接口的v6地址
+					dev_put(dev);
+					return 1;
+				}
+		}
+	in_dev6 = in_dev6->next;
+	}
+
+	dev_put(dev);  
+	return 0;
+}
+#else
+/*other kernel*/
 int get_ip6_by_name(char* if_name,struct in6_addr* p_ipv6)
 {
 	struct net_device *dev;
@@ -276,6 +322,7 @@ int get_ip6_by_name(char* if_name,struct in6_addr* p_ipv6)
 	dev_put(dev);  
 	return 0;
 }
+#endif
 
 //获取连接记录返回1
 int get_entry(struct sk_buff *skb,struct conn_entry** pp_entry,int direc)
