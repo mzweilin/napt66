@@ -9,6 +9,7 @@
 #include <linux/types.h>
 #include <net/ipv6.h>
 #include <linux/socket.h>
+#include <linux/version.h>
 
 
 #include "napt66_global.h"
